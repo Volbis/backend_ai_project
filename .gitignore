@@ -27,4 +27,4 @@ env/
 .DS_Store
 Thumbs.db
 
-.docx
+*.docx
