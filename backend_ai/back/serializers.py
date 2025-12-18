@@ -4,7 +4,7 @@ from .models import Dossier, Document, Report
 class DocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
-        fields = '__all__'
+        fields = '__all__' 
 
 class ReportSerializer(serializers.ModelSerializer):
     class Meta:

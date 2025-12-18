@@ -3,18 +3,20 @@ from .layout.layoutlm import LayoutLM
 from .analysis.llama_analysis import LlamaAnalysis
 from .schemas import DocumentAnalysisResult
 
-class AIPipeline:
-    def __init__(self):
+class AIPipeline: 
+    def __init__(self): 
         self.ocr = PaddleOCR()
         self.layout = LayoutLM()
         self.analysis = LlamaAnalysis()
 
     def process_document(self, file_path: str) -> DocumentAnalysisResult:
         # 1. OCR
-        ocr_text = self.ocr.extract_text(file_path)
+        # Returns list of dicts: [{'text': '...', 'box': [...]}, ...]
+        ocr_data = self.ocr.extract_text(file_path)
         
         # 2. Layout Analysis
-        layout_data = self.layout.analyze_layout(file_path, ocr_text)
+        # Takes structured OCR data
+        layout_data = self.layout.analyze_layout(file_path, ocr_data)
         
         # 3. Semantic Analysis & Verification
         inconsistencies = self.analysis.verify_consistency(layout_data)
