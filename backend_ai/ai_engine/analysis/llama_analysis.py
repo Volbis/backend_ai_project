@@ -21,7 +21,7 @@ class LlamaAnalysis:
             logger.warning("OpenAI client not available. Using mock mode.")
             self.client = None
             return
-
+ 
         try:
             # OpenRouter configuration
             api_key = config('OPENROUTER_API_KEY', default=None)
@@ -79,12 +79,24 @@ class LlamaAnalysis:
                 logger.warning("No text to verify consistency")
                 return []
                 
-            prompt = f"""
-Analyze the following text from an administrative document:
+            prompt = f"""You are an expert document verifier. Analyze the following text extracted from an administrative document.
+
+TEXT:
 "{text}"
 
-Identify any logical inconsistencies (e.g., dates in the future for birth, conflicting names, expired validity).
-Return a JSON object with a key "inconsistencies" containing a list of strings.
+TASK:
+Identify any logical inconsistencies such as:
+- Dates in the future (for birth dates, issuance dates)
+- Expired validity dates
+- Conflicting information (e.g., different names, mismatched dates)
+- Impossible dates (e.g., Feb 30, month 13)
+- Age inconsistencies
+
+Return ONLY a JSON object with this exact structure:
+{{"inconsistencies": ["description of inconsistency 1", "description of inconsistency 2"]}}
+
+If no inconsistencies are found, return:
+{{"inconsistencies": []}}
 """
             response = self._call_llm(prompt)
             return response.get("inconsistencies", [])
@@ -99,16 +111,39 @@ Return a JSON object with a key "inconsistencies" containing a list of strings.
                 logger.warning("No text to check compliance")
                 return 0.5
                 
-            prompt = f"""
-Analyze the following text:
+            prompt = f"""You are an expert document quality assessor. Analyze the following text extracted from an administrative document.
+
+TEXT:
 "{text}"
 
-Rate the compliance of this document on a scale of 0.0 to 1.0 based on legibility and completeness.
-Return a JSON object with a key "score" (float).
+TASK:
+Rate the document's compliance and quality on a scale of 0.0 to 1.0 based on:
+1. Text legibility and clarity (0.3 weight)
+2. Document completeness - all expected fields present (0.4 weight)
+3. Information coherence and validity (0.3 weight)
+
+SCORING GUIDE:
+- 0.9-1.0: Excellent - Clear, complete, all information valid
+- 0.7-0.9: Good - Minor issues, mostly complete
+- 0.5-0.7: Fair - Some missing fields or unclear text
+- 0.3-0.5: Poor - Significant issues with legibility or completeness
+- 0.0-0.3: Very Poor - Mostly illegible or critically incomplete
+
+Return ONLY a JSON object with this exact structure:
+{{"score": 0.85, "reasoning": "brief explanation of the score"}}
 """
             response = self._call_llm(prompt)
             score = response.get("score", 0.5)
-            return float(score) if isinstance(score, (int, float)) else 0.5
+            reasoning = response.get("reasoning", "")
+            
+            if reasoning:
+                logger.info(f"Compliance reasoning: {reasoning}")
+            
+            # Validate score is in valid range
+            score = float(score) if isinstance(score, (int, float)) else 0.5
+            score = max(0.0, min(1.0, score))  # Clamp between 0 and 1
+            
+            return score
         except Exception as e:
             logger.error(f"Compliance check failed: {e}")
             return 0.5

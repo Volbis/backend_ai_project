@@ -13,7 +13,7 @@ except ImportError:
     LayoutLMv3Processor = None
     logger.warning("transformers/torch not installed")
 
-class LayoutLM:
+class LayoutLM: 
     def __init__(self):
         if LayoutLMv3Processor is None:
             logger.warning("LayoutLM not available. Using mock mode.")
@@ -86,15 +86,17 @@ class LayoutLM:
                 outputs = self.model(**encoding)
             
             # Process outputs (logits to predictions)
-            # This part depends heavily on the labels the model was trained on.
-            # The base model doesn't have specific labels for "Name", "Date", etc.
-            # For this MVP, we will return the raw OCR text structured by the model's tokenization
+            # For MVP, use simple heuristics to detect document type from text content
+            all_text = " ".join(words).lower()
+            
+            # Simple keyword-based classification
+            document_type = self._classify_document_type(all_text, ocr_results)
             
             predictions = outputs.logits.argmax(-1).squeeze().tolist()
-            logger.info(f"Layout analysis completed for {image_path}")
+            logger.info(f"Layout analysis completed for {image_path}. Detected type: {document_type}")
             
             return {
-                "document_type": "detected_via_classification_head", # Placeholder
+                "document_type": document_type,
                 "fields": {
                     "raw_text": " ".join(words),
                     "segments": ocr_results
@@ -103,4 +105,35 @@ class LayoutLM:
         except Exception as e:
             logger.error(f"Layout analysis failed for {image_path}: {e}")
             return {"document_type": "error", "fields": {}}
+    
+    def _classify_document_type(self, text: str, ocr_results: list) -> str:
+        """Simple keyword-based document type classification"""
+        text_lower = text.lower()
+        
+        # Check for ID card keywords
+        id_keywords = ['carte', 'identité', 'identity', 'card', 'national', 'passport', 'passeport']
+        if any(keyword in text_lower for keyword in id_keywords):
+            return "ID_Card"
+        
+        # Check for transcript/diploma keywords
+        transcript_keywords = ['relevé', 'notes', 'transcript', 'diplôme', 'diploma', 'université', 'university']
+        if any(keyword in text_lower for keyword in transcript_keywords):
+            return "Academic_Transcript"
+        
+        # Check for birth certificate keywords
+        birth_keywords = ['naissance', 'birth', 'certificate', 'acte', 'né', 'born']
+        if any(keyword in text_lower for keyword in birth_keywords):
+            return "Birth_Certificate"
+        
+        # Check for proof of residence keywords
+        residence_keywords = ['domicile', 'résidence', 'residence', 'facture', 'bill', 'électricité', 'electricity']
+        if any(keyword in text_lower for keyword in residence_keywords):
+            return "Proof_of_Residence"
+        
+        # Check for invoice/receipt keywords
+        invoice_keywords = ['facture', 'invoice', 'reçu', 'receipt', 'total', 'montant', 'amount']
+        if any(keyword in text_lower for keyword in invoice_keywords):
+            return "Invoice"
+        
+        return "Unknown"
  
